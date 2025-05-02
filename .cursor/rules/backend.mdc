@@ -1,0 +1,120 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: 보카맨 백엔드 (Node.js/Express/MariaDB) 개발 규칙. 프로젝트 구조, 기술 스택, 코딩 컨벤션을 정의하여 AI 코드 생성을 돕습니다.
+ 
+
+# Cursor AI 사용자 정의 규칙: 보카맨 백엔드 (Node.js/Express/MariaDB)
+# 규칙설명 : 이 규칙은 보카맨 앱의 Node.js/Express 백엔드 개발 시Cursor AI가 프로젝트 구조, 기술 스택, 코딩 컨벤션을 이해하고 일관성 있는 코드 생성을 돕도록 정의합니다.
+
+#프로젝트 컨텍스트
+context:
+  #사용 언어 및 프레임워크
+  language: JavaScript (Node.js)
+  framework: Express.js
+  database: MariaDB (mariadb 패키지 사용)
+
+  #주요 의존성
+  dependencies:
+    - express: 웹 서버 및 라우팅
+    - mariadb: MariaDB 데이터베이스 연결 및 쿼리
+    - dotenv: 환경 변수 관리 (.env 파일 사용)
+
+  #프로젝트 구조 (예상)
+  # 실제 구조에 맞게 조정 필요
+  project_structure:
+    - config/db.config.js: 데이터베이스 연결 설정 (또는 server.js 내 직접 설정)
+    - db/connection.js: MariaDB 연결 풀 생성 및 관리 (또는 server.js 내 직접 설정)
+    - routes/: API 라우트 정의 (예: userRoutes.js, datasetRoutes.js)
+    - controllers/: 요청 처리 로직 (예: userController.js, datasetController.js)
+    - models/: (선택 사항) 데이터베이스 상호작용 로직 (쿼리 함수 등)
+    - server.js: 메인 서버 진입점
+
+  # 데이터베이스 연결
+  database_connection:
+    # 'mariadb' 패키지의 연결 풀(pool) 객체를 사용합니다.
+    # 연결 풀은 server.js 또는 db/connection.js 에서 생성 및 관리됩니다.
+    # 예시: const pool = mariadb.createPool(dbConfig);
+    # 쿼리 실행 시: const conn = await pool.getConnection(); ... conn.query(...); conn.release();
+    connection_pool_variable: pool # 코드에서 사용하는 연결 풀 변수명
+
+  # 데이터베이스 스키마 (주요 테이블 요약)
+  # 테이블 생성 스크립트(mariadb_create_tables_sql) 참고
+  database_schema:
+    - Users (user_id, role, email, password_hash, google_id, nickname, settings...)
+    - UserRelations (parent_user_id, child_user_id, status)
+    - Concepts (concept_id, image_url, created_by)
+    - Terms (term_id, concept_id, language_code, text, audio_ref)
+    - Hints (hint_id, term_id, hint_type, hint_content, language_code)
+    - Datasets (dataset_id, name, owner_user_id, source_language_code, target_language_code)
+    - DatasetConcepts (dataset_id, concept_id)
+    - UserStats (user_id, language_pair_code, wins, losses, best_streak)
+    - GameLogs (log_id, user_id, term_id, was_correct, attempts, source)
+    - HomeworkAssignments (assignment_id, parent_user_id, child_user_id, dataset_id, status, reward)
+    - HomeworkProgress (progress_id, assignment_id, term_id, status)
+    - Notifications (notification_id, recipient_user_id, type, message, is_read)
+
+# 코드 생성 가이드라인
+generation_guidelines:
+  # API 설계
+  api_design:
+    # RESTful 원칙을 따릅니다. (자원 기반 URL, 표준 HTTP 메소드)
+    # API 경로는 '/api/v2/' 접두사를 사용하는 것을 고려합니다. (예: /api/v2/users)
+    style: RESTful
+    prefix: /api/v2 # (선택 사항)
+
+  # 코드 스타일
+  code_style:
+    # 비동기 작업에는 async/await를 사용합니다.
+    async_await: true
+    # 데이터베이스 작업은 try...catch 블록으로 감싸 에러를 처리합니다.
+    error_handling: try_catch
+    # 변수 선언 시 const 또는 let을 사용합니다. (var 사용 지양)
+    variable_declaration: const_let
+    # 주석을 적절히 사용하여 코드의 의도를 명확히 합니다.
+    comments: encourage_meaningful_comments
+
+  # 데이터베이스 상호작용
+  database_interaction:
+    # 모든 데이터베이스 쿼리는 'pool.getConnection()'을 통해 얻은 연결(connection) 객체를 사용합니다.
+    # 사용 후에는 반드시 'conn.release()'를 호출하여 연결을 풀에 반환해야 합니다. (try...finally 구조 권장)
+    query_execution: use_connection_pool
+    # SQL Injection 공격을 방지하기 위해 사용자 입력값은 반드시 플레이스홀더(?)를 사용하여 쿼리에 바인딩합니다.
+    # 예: conn.query('SELECT * FROM Users WHERE user_id = ?', [userId]);
+    sql_injection_prevention: use_placeholders
+
+  # 응답 형식
+  response_format:
+    # API 응답은 JSON 형식을 사용합니다.
+    # 성공 시: { status: 'success', data: { ... } } 또는 { data: [...] }
+    # 실패 시: { status: 'error', message: '에러 메시지' } 형식으로 응답하는 것을 고려합니다.
+    # 적절한 HTTP 상태 코드(200, 201, 400, 401, 403, 404, 500 등)를 사용합니다.
+    format: JSON
+    status_codes: use_appropriate_http_status
+
+  # 보안
+  security:
+    # 사용자 입력값에 대한 유효성 검사(validation)를 수행해야 합니다. (추후 라이브러리 사용 고려)
+    input_validation: important
+    # 인증 및 인가(Authorization) 로직이 필요한 API는 추후 미들웨어 등을 통해 처리될 것을 염두에 둡니다.
+    auth: consider_middleware_for_auth
+
+# 특정 작업 요청 시 지침
+instructions:
+  # 새 API 엔드포인트 생성 요청 시
+  generate_api_endpoint:
+    - "새로운 API 엔드포인트를 위한 라우트, 컨트롤러 함수, (필요시) 모델 함수를 생성합니다."
+    - "요청 처리 흐름: 라우트 -> 컨트롤러 -> (모델) -> 데이터베이스 -> 컨트롤러 -> 응답"
+    - "컨트롤러 함수는 async 함수로 작성하고, 데이터베이스 작업은 await pool.getConnection() 및 conn.query()를 사용합니다."
+    - "try...catch로 에러를 처리하고 적절한 HTTP 상태 코드와 JSON 응답을 반환합니다."
+    - "데이터베이스 쿼리 시 플레이스홀더(?)를 사용합니다."
+
+  # 데이터베이스 쿼리 함수 생성 요청 시
+  generate_db_query_function:
+    - "주어진 작업을 수행하는 SQL 쿼리를 작성합니다."
+    - "async 함수 내에서 pool.getConnection(), conn.query(), conn.release() 패턴을 사용합니다."
+    - "플레이스홀더(?)를 사용하여 SQL Injection을 방지합니다."
+    - "쿼리 결과를 반환하거나, 에러 발생 시 에러를 throw합니다."
+

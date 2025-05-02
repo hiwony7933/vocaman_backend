@@ -1,0 +1,31 @@
+
+# Git 관련 파일
+.git
+.gitignore
+
+# Node.js 의존성 폴더 (이미지 내에서 설치하므로 제외)
+node_modules
+
+# 환경 변수 파일 (컨테이너 환경 변수로 주입하므로 제외)
+.env
+.env.*
+
+# Docker 관련 파일
+Dockerfile
+.dockerignore
+
+# 운영체제 특정 파일
+.DS_Store
+Thumbs.db
+
+# 로그 파일
+*.log
+
+# 테스트 파일 (필요시)
+test/
+tests/
+*.test.js
+
+# 기타 개발 관련 파일
+README.md
+*.md
