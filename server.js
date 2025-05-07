@@ -5,7 +5,7 @@ const path = require("path"); // 추가
 const swaggerJsdoc = require("swagger-jsdoc"); // 추가
 const swaggerUi = require("swagger-ui-express"); // 추가
 
-// 배포 테스트5
+// 배포 테스트6
 // .env 파일 로드
 dotenv.config();
 
