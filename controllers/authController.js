@@ -10,9 +10,21 @@ const JWT_SECRET = process.env.JWT_SECRET; // .env 파일에서 시크릿 키 �
 const ACCESS_TOKEN_EXPIRES_IN = "1h"; // 액세스 토큰 유효 기간 (예: 1시간)
 const REFRESH_TOKEN_EXPIRES_IN = "7d"; // 리프레시 토큰 유효 기간 (예: 7일)
 
-// Google OAuth 설정
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID; // .env 파일에서 클라이언트 ID 로드
-const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+// Google OAuth 설정 - 여러 플랫폼 지원
+const GOOGLE_WEB_CLIENT_ID =
+  process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_WEB_CLIENT_ID; // 기존 환경변수와 호환성 유지
+const GOOGLE_ANDROID_CLIENT_ID = process.env.GOOGLE_ANDROID_CLIENT_ID;
+const GOOGLE_IOS_CLIENT_ID = process.env.GOOGLE_IOS_CLIENT_ID;
+
+// 사용 가능한 모든 클라이언트 ID 목록 (undefined 값은 필터링)
+const GOOGLE_CLIENT_IDS = [
+  GOOGLE_WEB_CLIENT_ID,
+  GOOGLE_ANDROID_CLIENT_ID,
+  GOOGLE_IOS_CLIENT_ID,
+].filter((id) => id); // undefined/null/empty 값 제거
+
+// Google OAuth 클라이언트 생성 (기본값으로 웹 클라이언트 ID 사용)
+const googleClient = new OAuth2Client(GOOGLE_WEB_CLIENT_ID);
 
 // TODO: 데이터베이스 연결 풀 가져오기 (예: ../db/connection 또는 ../server)
 // const pool = require('../path/to/pool');
@@ -166,10 +178,39 @@ exports.googleLogin = async (req, res) => {
   let conn;
   try {
     // 1. Google ID 토큰 검증
-    const ticket = await googleClient.verifyIdToken({
-      idToken: idToken,
-      audience: GOOGLE_CLIENT_ID,
-    });
+    let ticket;
+    let verificationError;
+
+    // 각 클라이언트 ID로 차례대로 검증 시도
+    for (const clientId of GOOGLE_CLIENT_IDS) {
+      try {
+        ticket = await googleClient.verifyIdToken({
+          idToken: idToken,
+          audience: clientId,
+        });
+        // 성공적으로 검증되면 반복 중단
+        break;
+      } catch (error) {
+        // 마지막 오류 저장
+        verificationError = error;
+        console.log(
+          `ID 토큰 검증 실패 (클라이언트 ID: ${clientId}): ${error.message}`
+        );
+        // 계속해서 다음 클라이언트 ID로 시도
+      }
+    }
+
+    // 모든 클라이언트 ID로 검증에 실패한 경우
+    if (!ticket) {
+      console.error(
+        "모든 Google 클라이언트 ID로 검증 실패:",
+        verificationError.message
+      );
+      return res
+        .status(401)
+        .json({ message: "유효하지 않은 Google ID 토큰입니다." });
+    }
+
     const payload = ticket.getPayload();
     const googleUserId = payload["sub"];
     const email = payload["email"];
