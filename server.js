@@ -60,7 +60,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: `http://localhost:${PORT}`, // 개발 서버 주소 (환경에 맞게 변경)
+        url: `http://182.221.127.172:${PORT}`, // 개발 서버 주소 (환경에 맞게 변경)
         description: "Development server",
       },
       // TODO: 실제 배포 서버 주소 추가
