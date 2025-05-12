@@ -25,7 +25,13 @@ const NAS_EXTERNAL_PORT = process.env.EXTERNAL_PORT || 8080;
 
 // --- CORS 설정 ---
 // 프론트엔드 개발 환경의 출처를 허용합니다.
-const allowedOrigins = ["http://localhost:8081"]; // 필요한 경우 다른 출처도 추가 가능
+const allowedOrigins = [
+  "http://localhost:8081", // 프론트엔드 개발 환경
+  `http://${process.env.NAS_EXTERNAL_IP || "182.221.127.172"}:${
+    process.env.EXTERNAL_PORT || 8080
+  }`, // Swagger UI (NAS 외부 접속용)
+  // 필요하다면 로컬 개발환경에서 Swagger UI 접근 시 출처(예: http://localhost:8080)도 추가할 수 있습니다.
+];
 
 const corsOptions = {
   origin: function (origin, callback) {
