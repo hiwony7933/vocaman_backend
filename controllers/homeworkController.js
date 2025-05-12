@@ -73,14 +73,24 @@ exports.getAssignedHomework = async (req, res) => {
     conn = await pool.getConnection();
     // 숙제 정보와 함께 데이터셋 이름, 부모 닉네임 조회
     const query = `
-      SELECT ha.*, d.name as dataset_name, u.nickname as parent_nickname
+      SELECT ha.assignment_id, ha.parent_user_id, ha.child_user_id, ha.dataset_id, ha.status, ha.reward, ha.progress_percentage, ha.completed_at, ha.created_at, 
+             d.name as dataset_name, u.nickname as parent_nickname
       FROM HomeworkAssignments ha
       JOIN Datasets d ON ha.dataset_id = d.dataset_id
       JOIN Users u ON ha.parent_user_id = u.user_id
       WHERE ha.child_user_id = ?
       ORDER BY ha.created_at DESC
     `;
-    const [assignments] = await conn.query(query, [childUserId]);
+    const [rows] = await conn.query(query, [childUserId]);
+    const assignments = rows.map((a) => ({
+      ...a,
+      assignment_id: a.assignment_id ? a.assignment_id.toString() : undefined,
+      parent_user_id: a.parent_user_id
+        ? a.parent_user_id.toString()
+        : undefined,
+      child_user_id: a.child_user_id ? a.child_user_id.toString() : undefined,
+      dataset_id: a.dataset_id ? a.dataset_id.toString() : undefined,
+    }));
     res.status(200).json({ data: assignments });
   } catch (error) {
     console.error("할당된 숙제 목록 조회 중 오류 발생:", error);
@@ -100,14 +110,24 @@ exports.getCreatedHomework = async (req, res) => {
     conn = await pool.getConnection();
     // 숙제 정보와 함께 데이터셋 이름, 자녀 닉네임 조회
     const query = `
-      SELECT ha.*, d.name as dataset_name, u.nickname as child_nickname
+      SELECT ha.assignment_id, ha.parent_user_id, ha.child_user_id, ha.dataset_id, ha.status, ha.reward, ha.progress_percentage, ha.completed_at, ha.created_at,
+             d.name as dataset_name, u.nickname as child_nickname
       FROM HomeworkAssignments ha
       JOIN Datasets d ON ha.dataset_id = d.dataset_id
       JOIN Users u ON ha.child_user_id = u.user_id
       WHERE ha.parent_user_id = ?
       ORDER BY ha.created_at DESC
     `;
-    const [assignments] = await conn.query(query, [parentUserId]);
+    const [rows] = await conn.query(query, [parentUserId]);
+    const assignments = rows.map((a) => ({
+      ...a,
+      assignment_id: a.assignment_id ? a.assignment_id.toString() : undefined,
+      parent_user_id: a.parent_user_id
+        ? a.parent_user_id.toString()
+        : undefined,
+      child_user_id: a.child_user_id ? a.child_user_id.toString() : undefined,
+      dataset_id: a.dataset_id ? a.dataset_id.toString() : undefined,
+    }));
     res.status(200).json({ data: assignments });
   } catch (error) {
     console.error("생성한 숙제 목록 조회 중 오류 발생:", error);
@@ -127,7 +147,8 @@ exports.getHomeworkDetails = async (req, res) => {
   try {
     conn = await pool.getConnection();
     const query = `
-      SELECT ha.*, d.name as dataset_name, d.source_language_code, d.target_language_code,
+      SELECT ha.assignment_id, ha.parent_user_id, ha.child_user_id, ha.dataset_id, ha.status, ha.reward, ha.progress_percentage, ha.completed_at, ha.created_at,
+             d.name as dataset_name, d.source_language_code, d.target_language_code,
              p.nickname as parent_nickname, c.nickname as child_nickname
       FROM HomeworkAssignments ha
       JOIN Datasets d ON ha.dataset_id = d.dataset_id
@@ -135,8 +156,8 @@ exports.getHomeworkDetails = async (req, res) => {
       JOIN Users c ON ha.child_user_id = c.user_id
       WHERE ha.assignment_id = ?
     `;
-    const [assignments] = await conn.query(query, [assignmentId]);
-    const assignment = assignments;
+    const [rows] = await conn.query(query, [assignmentId]);
+    let assignment = rows; // mariadb v3+는 단일 객체 반환 가정, 아닐 경우 rows[0]
 
     if (!assignment) {
       return res.status(404).json({ message: "숙제를 찾을 수 없습니다." });
@@ -144,13 +165,33 @@ exports.getHomeworkDetails = async (req, res) => {
 
     // 접근 권한 확인 (숙제 출제자 또는 숙제 대상자)
     if (
-      assignment.parent_user_id !== userId &&
-      assignment.child_user_id !== userId
+      (assignment.parent_user_id
+        ? assignment.parent_user_id.toString()
+        : undefined) !== userId && // 비교 전 userId도 문자열인지 확인 필요, 혹은 Number(userId) === Number(assignment.parent_user_id)
+      (assignment.child_user_id
+        ? assignment.child_user_id.toString()
+        : undefined) !== userId
     ) {
       return res
         .status(403)
         .json({ message: "숙제 정보를 조회할 권한이 없습니다." });
     }
+
+    assignment = {
+      ...assignment,
+      assignment_id: assignment.assignment_id
+        ? assignment.assignment_id.toString()
+        : undefined,
+      parent_user_id: assignment.parent_user_id
+        ? assignment.parent_user_id.toString()
+        : undefined,
+      child_user_id: assignment.child_user_id
+        ? assignment.child_user_id.toString()
+        : undefined,
+      dataset_id: assignment.dataset_id
+        ? assignment.dataset_id.toString()
+        : undefined,
+    };
 
     // TODO: 숙제 진행 상황 (HomeworkProgress) 요약 정보 추가 가능
 
@@ -435,24 +476,32 @@ exports.submitHomeworkProgress = async (req, res) => {
 
 // GET /api/v2/homework/assignments/{assignment_id}/progress
 exports.getHomeworkProgress = async (req, res) => {
-  const userId = req.user.userId; // 요청자는 부모여야 함
+  const userId = req.user.userId; // 요청자는 부모 또는 숙제 당사자 (API 명세와 기능 일치 필요)
   const { assignmentId } = req.params;
 
   let conn;
   try {
     conn = await pool.getConnection();
 
-    // 1. 숙제 정보 및 요청자 권한(부모) 확인
-    const [assignments] = await conn.query(
+    // 1. 숙제 정보 및 요청자 권한 확인
+    const [assignmentRows] = await conn.query(
       "SELECT assignment_id, parent_user_id, child_user_id FROM HomeworkAssignments WHERE assignment_id = ?",
       [assignmentId]
     );
-    const assignment = assignments;
+    const assignment = assignmentRows; // mariadb v3+는 단일 객체 반환 가정
 
     if (!assignment) {
       return res.status(404).json({ message: "해당 숙제를 찾을 수 없습니다." });
     }
-    if (assignment.parent_user_id !== userId) {
+    // 부모이거나, 해당 숙제를 할당받은 자녀 본인만 조회 가능하도록 수정
+    if (
+      (assignment.parent_user_id
+        ? assignment.parent_user_id.toString()
+        : undefined) !== userId &&
+      (assignment.child_user_id
+        ? assignment.child_user_id.toString()
+        : undefined) !== userId
+    ) {
       return res
         .status(403)
         .json({ message: "이 숙제의 진행 상황을 조회할 권한이 없습니다." });
@@ -460,13 +509,19 @@ exports.getHomeworkProgress = async (req, res) => {
 
     // 2. 해당 숙제의 모든 진행 상황 조회 (Term 정보 포함)
     const query = `
-      SELECT hp.term_id, hp.status, hp.submitted_at, t.text as term_text, t.language_code as term_language
+      SELECT hp.progress_id, hp.assignment_id, hp.term_id, hp.status, hp.submitted_at, t.text as term_text, t.language_code as term_language
       FROM HomeworkProgress hp
       JOIN Terms t ON hp.term_id = t.term_id
       WHERE hp.assignment_id = ?
       ORDER BY hp.submitted_at DESC
     `;
-    const [progressList] = await conn.query(query, [assignmentId]);
+    const [rows] = await conn.query(query, [assignmentId]);
+    const progressList = rows.map((p) => ({
+      ...p,
+      progress_id: p.progress_id ? p.progress_id.toString() : undefined, // HomeworkProgress의 PK도 변환
+      assignment_id: p.assignment_id ? p.assignment_id.toString() : undefined, // 중복될 수 있으나 명시적으로 변환
+      term_id: p.term_id ? p.term_id.toString() : undefined,
+    }));
 
     // TODO: 데이터셋의 전체 단어 목록과 비교하여 아직 풀지 않은 단어 정보도 함께 제공하면 더 유용할 수 있음
 

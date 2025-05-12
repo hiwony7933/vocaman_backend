@@ -223,41 +223,82 @@ exports.getMyRelations = async (req, res) => {
     conn = await pool.getConnection();
 
     // 내가 부모인 관계 (자녀 정보 포함)
-    const [childrenRelations] = await conn.query(
+    const [childrenRows] = await conn.query(
       `SELECT ur.relation_id, ur.status, u.user_id as child_id, u.nickname as child_nickname, u.email as child_email
        FROM UserRelations ur
        JOIN Users u ON ur.child_user_id = u.user_id
-       WHERE ur.parent_user_id = ?`, // status 필터링은 필요에 따라 추가 (예: AND ur.status = 'approved')
+       WHERE ur.parent_user_id = ?`,
       [userId]
     );
+    const childrenRelations = childrenRows.map((r) => ({
+      ...r,
+      relation_id: r.relation_id ? r.relation_id.toString() : undefined,
+      child_id: r.child_id ? r.child_id.toString() : undefined,
+    }));
 
     // 내가 자녀인 관계 (부모 정보 포함)
-    const [parentRelations] = await conn.query(
+    const [parentRows] = await conn.query(
       `SELECT ur.relation_id, ur.status, u.user_id as parent_id, u.nickname as parent_nickname, u.email as parent_email
        FROM UserRelations ur
        JOIN Users u ON ur.parent_user_id = u.user_id
        WHERE ur.child_user_id = ?`,
       [userId]
     );
+    const parentRelations = parentRows.map((r) => ({
+      ...r,
+      relation_id: r.relation_id ? r.relation_id.toString() : undefined,
+      parent_id: r.parent_id ? r.parent_id.toString() : undefined,
+    }));
 
-    // 결과 형식화 (예: 보류 중인 요청, 승인된 부모/자녀 분리)
-    const pendingRequests = parentRelations.filter(
-      (r) => r.status === "pending"
-    );
-    const approvedParents = parentRelations.filter(
-      (r) => r.status === "approved"
-    );
-    const approvedChildren = childrenRelations.filter(
-      (r) => r.status === "approved"
-    );
-    const pendingSentRequests = childrenRelations.filter(
-      (r) => r.status === "pending"
-    );
+    // 결과 형식화
+    const pendingReceived = parentRelations
+      .filter((r) => r.status === "pending")
+      .map((r) => ({
+        // 부모 정보만 포함 (요청자 정보)
+        relation_id: r.relation_id,
+        status: r.status,
+        requester_id: r.parent_id,
+        requester_nickname: r.parent_nickname,
+        requester_email: r.parent_email,
+      }));
+
+    const pendingSent = childrenRelations
+      .filter((r) => r.status === "pending")
+      .map((r) => ({
+        // 자녀 정보만 포함 (요청 대상 정보)
+        relation_id: r.relation_id,
+        status: r.status,
+        addressee_id: r.child_id,
+        addressee_nickname: r.child_nickname,
+        addressee_email: r.child_email,
+      }));
+
+    const approvedParents = parentRelations
+      .filter((r) => r.status === "approved")
+      .map((r) => ({
+        // 부모 정보
+        relation_id: r.relation_id,
+        status: r.status,
+        parent_id: r.parent_id,
+        parent_nickname: r.parent_nickname,
+        parent_email: r.parent_email,
+      }));
+
+    const approvedChildren = childrenRelations
+      .filter((r) => r.status === "approved")
+      .map((r) => ({
+        // 자녀 정보
+        relation_id: r.relation_id,
+        status: r.status,
+        child_id: r.child_id,
+        child_nickname: r.child_nickname,
+        child_email: r.child_email,
+      }));
 
     res.status(200).json({
       data: {
-        pendingReceived: pendingRequests, // 내가 받은 요청 (자녀 입장)
-        pendingSent: pendingSentRequests, // 내가 보낸 요청 (부모 입장)
+        pendingReceived,
+        pendingSent,
         parents: approvedParents,
         children: approvedChildren,
       },

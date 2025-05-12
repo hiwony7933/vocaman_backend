@@ -7,14 +7,23 @@ exports.getConceptById = async (req, res) => {
   let conn;
   try {
     conn = await pool.getConnection();
-    const [concepts] = await conn.query(
-      "SELECT * FROM Concepts WHERE concept_id = ?",
+    const [rows] = await conn.query(
+      "SELECT concept_id, text_representation, concept_type, language_code, image_url, created_by, created_at, updated_at FROM Concepts WHERE concept_id = ?",
       [conceptId]
     );
-    const concept = concepts;
+    let concept = rows;
     if (!concept) {
       return res.status(404).json({ message: "Concept을 찾을 수 없습니다." });
     }
+    concept = {
+      ...concept,
+      concept_id: concept.concept_id
+        ? concept.concept_id.toString()
+        : undefined,
+      created_by: concept.created_by
+        ? concept.created_by.toString()
+        : undefined,
+    };
     res.status(200).json({ data: concept });
   } catch (error) {
     console.error("Concept 조회 중 오류 발생:", error);
@@ -33,18 +42,31 @@ exports.getTermById = async (req, res) => {
   try {
     conn = await pool.getConnection();
     // Term 정보와 관련 Hints 정보를 함께 조회
-    const termQuery = "SELECT * FROM Terms WHERE term_id = ?";
-    const hintQuery = "SELECT * FROM Hints WHERE term_id = ?";
+    const termQuery =
+      "SELECT term_id, concept_id, language_code, text, term_type, audio_url, image_url, created_at, updated_at FROM Terms WHERE term_id = ?";
+    const hintQuery =
+      "SELECT hint_id, term_id, hint_text, hint_type, created_at FROM Hints WHERE term_id = ?";
 
-    const [terms] = await conn.query(termQuery, [termId]);
-    const term = terms;
+    const [termRows] = await conn.query(termQuery, [termId]);
+    let term = termRows;
 
     if (!term) {
       return res.status(404).json({ message: "Term을 찾을 수 없습니다." });
     }
 
-    const [hints] = await conn.query(hintQuery, [termId]);
-    term.hints = hints || []; // hints 배열 추가
+    const [hintRows] = await conn.query(hintQuery, [termId]);
+    const hints = hintRows.map((h) => ({
+      ...h,
+      hint_id: h.hint_id ? h.hint_id.toString() : undefined,
+      term_id: h.term_id ? h.term_id.toString() : undefined,
+    }));
+
+    term = {
+      ...term,
+      term_id: term.term_id ? term.term_id.toString() : undefined,
+      concept_id: term.concept_id ? term.concept_id.toString() : undefined,
+      hints: hints || [],
+    };
 
     res.status(200).json({ data: term });
   } catch (error) {

@@ -8,10 +8,19 @@ exports.getNotifications = async (req, res) => {
     conn = await pool.getConnection();
 
     // 1. 사용자 알림 목록 조회 (최신순)
-    const [notifications] = await conn.query(
-      "SELECT notification_id, type, message, is_read, created_at FROM Notifications WHERE recipient_user_id = ? ORDER BY created_at DESC",
+    const [rows] = await conn.query(
+      "SELECT notification_id, type, message, is_read, created_at, related_entity_type, related_entity_id FROM Notifications WHERE recipient_user_id = ? ORDER BY created_at DESC",
       [userId]
     );
+    const notifications = rows.map((n) => ({
+      ...n,
+      notification_id: n.notification_id
+        ? n.notification_id.toString()
+        : undefined,
+      related_entity_id: n.related_entity_id
+        ? n.related_entity_id.toString()
+        : undefined,
+    }));
 
     // 2. 읽지 않은 알림 수 계산
     const unreadCount = notifications.filter((n) => !n.is_read).length;

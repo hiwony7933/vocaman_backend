@@ -60,12 +60,17 @@ exports.getAllDatasets = async (req, res) => {
     conn = await pool.getConnection();
 
     // 우선 모든 데이터셋 조회 (소유자 닉네임 포함)
-    const [datasets] = await conn.query(
+    const [rows] = await conn.query(
       `SELECT d.dataset_id, d.name, d.source_language_code, d.target_language_code, d.owner_user_id, u.nickname as owner_nickname
       FROM Datasets d
       JOIN Users u ON d.owner_user_id = u.user_id
       ORDER BY d.created_at DESC` // 최신순 정렬 (created_at 컬럼 가정)
     );
+    const datasets = rows.map((d) => ({
+      ...d,
+      dataset_id: d.dataset_id ? d.dataset_id.toString() : undefined,
+      owner_user_id: d.owner_user_id ? d.owner_user_id.toString() : undefined,
+    }));
 
     res.status(200).json({ data: datasets });
   } catch (error) {
@@ -87,18 +92,28 @@ exports.getDatasetById = async (req, res) => {
     conn = await pool.getConnection();
 
     // 1. 데이터셋 기본 정보 조회
-    const [datasets] = await conn.query(
+    const [rows] = await conn.query(
       `SELECT d.dataset_id, d.name, d.source_language_code, d.target_language_code, d.owner_user_id, u.nickname as owner_nickname, d.created_at
        FROM Datasets d
        JOIN Users u ON d.owner_user_id = u.user_id
        WHERE d.dataset_id = ?`,
       [datasetId]
     );
-    const dataset = datasets; // mariadb v3+
+    let dataset = rows; // mariadb v3+
 
     if (!dataset) {
       return res.status(404).json({ message: "데이터셋을 찾을 수 없습니다." });
     }
+
+    dataset = {
+      ...dataset,
+      dataset_id: dataset.dataset_id
+        ? dataset.dataset_id.toString()
+        : undefined,
+      owner_user_id: dataset.owner_user_id
+        ? dataset.owner_user_id.toString()
+        : undefined,
+    };
 
     // TODO: 2. 이 데이터셋에 속한 Concepts, Terms, Hints 정보 조회 로직 추가
 

@@ -24,6 +24,15 @@ exports.startGameSession = async (req, res) => {
     if (!dataset) {
       return res.status(404).json({ message: "데이터셋을 찾을 수 없습니다." });
     }
+    const processedDatasetInfo = {
+      ...dataset,
+      dataset_id: dataset.dataset_id
+        ? dataset.dataset_id.toString()
+        : undefined,
+      owner_user_id: dataset.owner_user_id
+        ? dataset.owner_user_id.toString()
+        : undefined, // owner_user_id도 BigInt일 수 있음
+    };
 
     // 2. 데이터셋에 포함된 단어 정보 (Concepts, Terms, Hints) 한번에 조회
     //    JOIN을 사용하여 관련 정보를 가져옵니다.
@@ -46,7 +55,7 @@ exports.startGameSession = async (req, res) => {
     if (rows.length === 0) {
       return res.status(200).json({
         message: "데이터셋에 포함된 단어가 없습니다.",
-        data: { datasetInfo: dataset, concepts: [] },
+        data: { datasetInfo: processedDatasetInfo, concepts: [] },
       });
     }
 
@@ -54,34 +63,49 @@ exports.startGameSession = async (req, res) => {
     const conceptsMap = new Map();
 
     rows.forEach((row) => {
-      let concept = conceptsMap.get(row.concept_id);
+      let concept = conceptsMap.get(
+        row.concept_id ? row.concept_id.toString() : undefined
+      );
       if (!concept) {
         concept = {
-          conceptId: row.concept_id,
+          conceptId: row.concept_id ? row.concept_id.toString() : undefined,
           imageUrl: row.image_url,
           terms: new Map(),
         };
-        conceptsMap.set(row.concept_id, concept);
+        conceptsMap.set(
+          row.concept_id ? row.concept_id.toString() : undefined,
+          concept
+        );
       }
 
-      let term = concept.terms.get(row.term_id);
+      let term = concept.terms.get(
+        row.term_id ? row.term_id.toString() : undefined
+      );
       if (!term) {
         term = {
-          termId: row.term_id,
+          termId: row.term_id ? row.term_id.toString() : undefined,
           languageCode: row.language_code,
           text: row.text,
           audioRef: row.audio_ref,
           hints: [],
         };
-        concept.terms.set(row.term_id, term);
+        concept.terms.set(
+          row.term_id ? row.term_id.toString() : undefined,
+          term
+        );
       }
 
       // Hint 정보 추가 (hint_id가 NULL이 아닌 경우)
       if (row.hint_id) {
         // 중복 hint 방지 (쿼리 결과에 따라 필요 없을 수 있음)
-        if (!term.hints.some((h) => h.hintId === row.hint_id)) {
+        if (
+          !term.hints.some(
+            (h) =>
+              h.hintId === (row.hint_id ? row.hint_id.toString() : undefined)
+          )
+        ) {
           term.hints.push({
-            hintId: row.hint_id,
+            hintId: row.hint_id ? row.hint_id.toString() : undefined,
             type: row.hint_type,
             content: row.hint_content,
             languageCode: row.hint_language_code,
@@ -101,9 +125,9 @@ exports.startGameSession = async (req, res) => {
     console.log(
       `Game session started for dataset ${dataset_id} by user ${userId}`
     );
-    res
-      .status(200)
-      .json({ data: { datasetInfo: dataset, concepts: conceptsData } });
+    res.status(200).json({
+      data: { datasetInfo: processedDatasetInfo, concepts: conceptsData },
+    });
   } catch (error) {
     console.error("게임 세션 시작 중 오류 발생:", error);
     res
@@ -148,17 +172,26 @@ exports.startGameSessionDefault = async (req, res) => {
     //    startGameSession 함수 내부 로직을 여기에 다시 구현하거나, 내부 호출
     //    여기서는 중복을 피하기 위해 startGameSession 내부 로직과 유사하게 재구현
 
-    const [datasets] = await conn.query(
+    const [datasetRows] = await conn.query(
       "SELECT * FROM Datasets WHERE dataset_id = ?",
       [defaultDatasetId]
     );
-    const dataset = datasets;
+    const dataset = datasetRows;
     if (!dataset) {
       // 위에서 찾았으므로 이론상 이 경우는 발생하지 않음
       return res
         .status(404)
         .json({ message: "기본 데이터셋 정보를 찾을 수 없습니다." });
     }
+    const processedDefaultDatasetInfo = {
+      ...dataset,
+      dataset_id: dataset.dataset_id
+        ? dataset.dataset_id.toString()
+        : undefined,
+      owner_user_id: dataset.owner_user_id
+        ? dataset.owner_user_id.toString()
+        : undefined,
+    };
 
     const query = `
       SELECT dc.concept_id, c.image_url, t.term_id, t.language_code, t.text, t.audio_ref, h.hint_id, h.hint_type, h.hint_content, h.language_code as hint_language_code
@@ -170,35 +203,50 @@ exports.startGameSessionDefault = async (req, res) => {
     if (rows.length === 0) {
       return res.status(200).json({
         message: "기본 데이터셋에 포함된 단어가 없습니다.",
-        data: { datasetInfo: dataset, concepts: [] },
+        data: { datasetInfo: processedDefaultDatasetInfo, concepts: [] },
       });
     }
 
     const conceptsMap = new Map();
     rows.forEach((row) => {
-      let concept = conceptsMap.get(row.concept_id);
+      let concept = conceptsMap.get(
+        row.concept_id ? row.concept_id.toString() : undefined
+      );
       if (!concept) {
         concept = {
-          conceptId: row.concept_id,
+          conceptId: row.concept_id ? row.concept_id.toString() : undefined,
           imageUrl: row.image_url,
           terms: new Map(),
         };
-        conceptsMap.set(row.concept_id, concept);
+        conceptsMap.set(
+          row.concept_id ? row.concept_id.toString() : undefined,
+          concept
+        );
       }
-      let term = concept.terms.get(row.term_id);
+      let term = concept.terms.get(
+        row.term_id ? row.term_id.toString() : undefined
+      );
       if (!term) {
         term = {
-          termId: row.term_id,
+          termId: row.term_id ? row.term_id.toString() : undefined,
           languageCode: row.language_code,
           text: row.text,
           audioRef: row.audio_ref,
           hints: [],
         };
-        concept.terms.set(row.term_id, term);
+        concept.terms.set(
+          row.term_id ? row.term_id.toString() : undefined,
+          term
+        );
       }
-      if (row.hint_id && !term.hints.some((h) => h.hintId === row.hint_id)) {
+      if (
+        row.hint_id &&
+        !term.hints.some(
+          (h) => h.hintId === (row.hint_id ? row.hint_id.toString() : undefined)
+        )
+      ) {
         term.hints.push({
-          hintId: row.hint_id,
+          hintId: row.hint_id ? row.hint_id.toString() : undefined,
           type: row.hint_type,
           content: row.hint_content,
           languageCode: row.hint_language_code,
@@ -213,9 +261,12 @@ exports.startGameSessionDefault = async (req, res) => {
     console.log(
       `Default game session started for grade ${grade} (dataset ${defaultDatasetId}) by user ${userId}`
     );
-    res
-      .status(200)
-      .json({ data: { datasetInfo: dataset, concepts: conceptsData } });
+    res.status(200).json({
+      data: {
+        datasetInfo: processedDefaultDatasetInfo,
+        concepts: conceptsData,
+      },
+    });
   } catch (error) {
     console.error("기본 게임 세션 시작 중 오류 발생:", error);
     res

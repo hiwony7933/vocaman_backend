@@ -1,6 +1,6 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken"); // jsonwebtoken 임포트
-const { pool } = require("../server"); // server.js에서 export한 pool 가져오기
+const { pool } = require("../config/db.config.js"); // db.config.js에서 직접 pool 가져오기
 const { OAuth2Client } = require("google-auth-library"); // Google 라이브러리 임포트
 
 const SALT_ROUNDS = 10; // 비밀번호 해싱 강도
@@ -112,14 +112,14 @@ exports.login = async (req, res) => {
 
     // 5. JWT 토큰 생성
     const accessTokenPayload = {
-      userId: user.user_id,
+      userId: user.user_id.toString(), // BigInt를 String으로 변환
       email: user.email,
       role: user.role,
       nickname: user.nickname,
       // 필요에 따라 다른 정보 추가 가능
     };
     const refreshTokenPayload = {
-      userId: user.user_id,
+      userId: user.user_id.toString(), // BigInt를 String으로 변환
       // 리프레시 토큰에는 최소한의 정보만 포함
     };
 
@@ -226,12 +226,12 @@ exports.googleLogin = async (req, res) => {
 
     // 5. JWT 토큰 생성
     const accessTokenPayload = {
-      userId: user.user_id,
+      userId: user.user_id.toString(), // BigInt를 String으로 변환
       email: user.email,
       role: user.role,
       nickname: user.nickname,
     };
-    const refreshTokenPayload = { userId: user.user_id };
+    const refreshTokenPayload = { userId: user.user_id.toString() }; // BigInt를 String으로 변환
 
     const accessToken = jwt.sign(accessTokenPayload, JWT_SECRET, {
       expiresIn: ACCESS_TOKEN_EXPIRES_IN,
@@ -312,7 +312,7 @@ exports.refreshToken = async (req, res) => {
 
     // 3. 새로운 액세스 토큰 생성
     const newAccessTokenPayload = {
-      userId: user.user_id,
+      userId: user.user_id.toString(), // BigInt를 String으로 변환
       email: user.email,
       role: user.role,
       nickname: user.nickname,
