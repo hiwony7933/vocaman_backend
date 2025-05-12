@@ -7,6 +7,7 @@ const dotenv = require("dotenv");
 const path = require("path"); // 파일 경로 관련 모듈
 const swaggerJsdoc = require("swagger-jsdoc"); // Swagger JSDoc 생성기
 const swaggerUi = require("swagger-ui-express"); // Swagger UI 미들웨어
+const cors = require("cors"); // cors 모듈 임포트
 
 // --- .env 파일 로드 ---
 // 애플리케이션 설정 및 민감한 정보를 .env 파일에서 로드합니다.
@@ -21,6 +22,29 @@ const APP_INTERNAL_PORT = process.env.PORT || 3000;
 // 이 값은 NAS Docker 포트 매핑과 일치해야 합니다. (예: 8080)
 // .env 파일에 EXTERNAL_PORT=8080 와 같이 정의하고 process.env.EXTERNAL_PORT 로 가져올 수도 있습니다.
 const NAS_EXTERNAL_PORT = process.env.EXTERNAL_PORT || 8080;
+
+// --- CORS 설정 ---
+// 프론트엔드 개발 환경의 출처를 허용합니다.
+const allowedOrigins = ["http://localhost:8081"]; // 필요한 경우 다른 출처도 추가 가능
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg =
+        "The CORS policy for this site does not allow access from the specified Origin.";
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE", // 허용할 HTTP 메소드
+  allowedHeaders: ["Content-Type", "Authorization"], // 허용할 요청 헤더 (Authorization 추가)
+  credentials: true, // 쿠키/인증 정보를 허용할지 여부 (필요한 경우)
+  optionsSuccessStatus: 200, // 일부 레거시 브라우저에서 OPTIONS 요청에 204 대신 200을 응답
+};
+
+app.use(cors(corsOptions)); // CORS 미들웨어 적용
 
 // 요청 본문(body)을 JSON 형태로 파싱하기 위한 미들웨어
 app.use(express.json());
