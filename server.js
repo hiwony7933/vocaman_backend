@@ -72,13 +72,13 @@ const swaggerOptions = {
     },
     servers: [
       {
-        // NAS 외부 IP와 외부로 매핑된 포트를 사용하도록 설정
-        url: `http://182.221.127.172:${NAS_EXTERNAL_PORT}/api/v2`,
+        // NAS 외부 IP와 외부로 매핑된 포트를 사용하도록 설정 (URL에서 /api/v2 제거)
+        url: `http://182.221.127.172:${NAS_EXTERNAL_PORT}`, // 수정된 부분
         description: "Development server (NAS)",
       },
       // 로컬 개발 환경에서 테스트할 경우를 위한 서버 정보 (선택 사항)
       // {
-      //   url: `http://localhost:${APP_INTERNAL_PORT}/api/v2`,
+      //   url: `http://localhost:${APP_INTERNAL_PORT}`, // 수정된 부분 (필요시)
       //   description: "Local Development Server"
       // }
     ],
